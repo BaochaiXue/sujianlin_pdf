@@ -45,7 +45,7 @@
    * 用 **Playwright + Chromium headless** 打开每个 URL。
    * `wait_until="networkidle"` + 再多等几秒，给 MathJax 时间渲染。([Scientific Spaces][3])
    * 用 `page.add_style_tag` 注入一段 CSS：
-
+  
      * 隐藏 sidebar、顶部导航、底部版权、评论区等；
      * 控制版心宽度、字体、A4 页边距；
      * 设置 `img { max-width: 100%; page-break-inside: avoid; }`。
