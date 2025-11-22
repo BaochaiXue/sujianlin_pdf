@@ -21,7 +21,6 @@ output/          # 运行后生成的输出目录
   *.pdf          # 最终合并后的“选集”PDF
 requirements.txt
 README.md
-idea.md
 ```
 
 ---
