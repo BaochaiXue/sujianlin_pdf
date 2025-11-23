@@ -44,8 +44,40 @@ def _safe_filename(title: str) -> str:
     return simplified or "article"
 
 
+def _navigate_with_retries(page: Page, url: str) -> None:
+    """
+    Try loading the page up to three times with progressively looser conditions/timeouts:
+    1) goto with load (75s)
+    2) reload with domcontentloaded (90s)
+    3) fresh goto with domcontentloaded (120s)
+    """
+    attempts = [
+        ("goto-load", lambda: page.goto(url, wait_until="load", timeout=75_000)),
+        (
+            "reload-domcontent",
+            lambda: page.reload(wait_until="domcontentloaded", timeout=90_000),
+        ),
+        (
+            "goto-domcontent",
+            lambda: page.goto(url, wait_until="domcontentloaded", timeout=120_000),
+        ),
+    ]
+
+    last_exc: Exception | None = None
+    for _, attempt in attempts:
+        try:
+            attempt()
+            return
+        except (
+            Exception
+        ) as exc:  # noqa: BLE001 - we want to retry on any navigation failure
+            last_exc = exc
+    if last_exc:
+        raise last_exc
+
+
 def _render_single(page: Page, post: Post, target: Path, delay_ms: int) -> None:
-    page.goto(post.url, wait_until="load", timeout=60_000)
+    _navigate_with_retries(page, post.url)
     page.wait_for_timeout(delay_ms)
     page.add_style_tag(content=PRINT_CSS)
     page.wait_for_timeout(200)
@@ -59,7 +91,9 @@ def _render_single(page: Page, post: Post, target: Path, delay_ms: int) -> None:
     page.close()
 
 
-def render_posts_to_pdfs(posts: Iterable[Post], output_dir: Path, delay_ms: int = 4000) -> List[Path]:
+def render_posts_to_pdfs(
+    posts: Iterable[Post], output_dir: Path, delay_ms: int = 4000
+) -> List[Path]:
     rendered_paths: List[Path] = []
     posts_list = list(posts)
     output_dir.mkdir(parents=True, exist_ok=True)
