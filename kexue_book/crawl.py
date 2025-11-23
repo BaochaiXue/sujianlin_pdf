@@ -12,6 +12,7 @@ from .types import Post
 
 BASE_CATEGORY_URL = "https://spaces.ac.cn/category/Big-Data"
 DATE_PATTERN = re.compile(r"(\d{4}-\d{2}-\d{2})")
+ARCHIVE_ID_PATTERN = re.compile(r"/(\\d+)$")
 
 
 def _parse_post(post_element: BeautifulSoup) -> Post:
@@ -67,7 +68,13 @@ def crawl_posts(start: date, end: date) -> List[Post]:
 
         page_url = _find_next_page(soup, page_url)
 
-    posts.sort(key=lambda p: p.date)
+    def _sort_key(p: Post) -> tuple[date, int]:
+        # Use archive id as tie-breaker so posts on the same date follow publish order.
+        match = ARCHIVE_ID_PATTERN.search(p.url)
+        archive_id = int(match.group(1)) if match else 0
+        return (p.date, archive_id)
+
+    posts.sort(key=_sort_key)
     return posts
 
 
