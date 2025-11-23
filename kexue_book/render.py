@@ -25,6 +25,7 @@ body {
 .PostContent {
     max-width: 960px;
     margin: 0 auto;
+    padding: 0 8px;
 }
 img {
     max-width: 100%;
@@ -36,6 +37,24 @@ h1, h2, h3, h4, h5, h6 {
 pre, code {
     font-family: 'JetBrains Mono', 'Menlo', monospace;
     white-space: pre-wrap;
+}
+
+/* MathJax: leave space for right-side equation numbers and avoid clipping. */
+mjx-container[jax="CHTML"][display="true"],
+mjx-container[jax="SVG"][display="true"] {
+    padding-right: 3.5em !important;
+    overflow: visible !important;
+}
+
+mjx-container[jax="CHTML"][display="true"] mjx-tag,
+mjx-container[jax="SVG"][display="true"] mjx-tag {
+    padding-left: .3em !important;
+}
+
+/* Hide MathJax status box (e.g., "Loading ...") so it won't appear in PDFs. */
+.MathJax_Message,
+#MathJax_Message {
+    display: none !important;
 }
 """
 
@@ -50,8 +69,18 @@ CSS_PX_PER_MM = 96 / 25.4
 A4_WIDTH_MM = 210
 LEFT_MARGIN_MM = 16
 RIGHT_MARGIN_MM = 16
-CONTENT_WIDTH_PX = int((A4_WIDTH_MM - LEFT_MARGIN_MM - RIGHT_MARGIN_MM) * CSS_PX_PER_MM)
+WIDTH_FUDGE = 0.95
+CONTENT_WIDTH_PX = int(
+    (A4_WIDTH_MM - LEFT_MARGIN_MM - RIGHT_MARGIN_MM) * CSS_PX_PER_MM * WIDTH_FUDGE
+)
 VIEWPORT = {"width": CONTENT_WIDTH_PX, "height": 1200}
+PDF_MARGINS = {
+    "top": "20mm",
+    "bottom": "20mm",
+    "left": f"{LEFT_MARGIN_MM}mm",
+    "right": f"{RIGHT_MARGIN_MM}mm",
+}
+PDF_SCALE = 0.9
 
 
 def _safe_filename(title: str) -> str:
@@ -91,6 +120,7 @@ def _navigate_with_retries(page: Page, url: str) -> None:
 
 def _render_single(page: Page, post: Post, target: Path, delay_ms: int) -> None:
     _navigate_with_retries(page, post.url)
+    page.emulate_media(media="screen")
     page.wait_for_timeout(delay_ms)
     page.add_style_tag(content=PRINT_CSS)
     page.wait_for_timeout(200)
@@ -98,8 +128,9 @@ def _render_single(page: Page, post: Post, target: Path, delay_ms: int) -> None:
     page.pdf(
         path=str(target),
         format="A4",
-        margin={"top": "20mm", "bottom": "20mm", "left": "16mm", "right": "16mm"},
+        margin=PDF_MARGINS,
         print_background=True,
+        scale=PDF_SCALE,
     )
     page.close()
 

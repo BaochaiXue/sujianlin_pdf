@@ -10,16 +10,34 @@ from .render import render_posts_to_pdfs
 
 
 def build_parser() -> ArgumentParser:
-    parser = ArgumentParser(description="Build a PDF book from Scientific Spaces Big-Data posts.")
-    parser.add_argument("--start", type=str, required=True, help="Start date YYYY-MM-DD (inclusive)")
-    parser.add_argument("--end", type=str, required=True, help="End date YYYY-MM-DD (inclusive)")
-    parser.add_argument("--out-dir", type=str, default="output", help="Output directory (default: output)")
-    parser.add_argument("--name", type=str, default="BigData", help="Book name prefix (default: BigData)")
-    parser.add_argument("--limit", type=int, default=None, help="Debug: only process first N posts")
+    parser = ArgumentParser(
+        description="Build a PDF book from Scientific Spaces Big-Data posts."
+    )
+    parser.add_argument(
+        "--start", type=str, required=True, help="Start date YYYY-MM-DD (inclusive)"
+    )
+    parser.add_argument(
+        "--end", type=str, required=True, help="End date YYYY-MM-DD (inclusive)"
+    )
+    parser.add_argument(
+        "--out-dir",
+        type=str,
+        default="output",
+        help="Output directory (default: output)",
+    )
+    parser.add_argument(
+        "--name",
+        type=str,
+        default="BigData",
+        help="Book name prefix (default: BigData)",
+    )
+    parser.add_argument(
+        "--limit", type=int, default=None, help="Debug: only process first N posts"
+    )
     parser.add_argument(
         "--delay-ms",
         type=int,
-        default=4000,
+        default=10_000,
         help="Extra wait time for MathJax rendering in milliseconds (default: 4000)",
     )
 
