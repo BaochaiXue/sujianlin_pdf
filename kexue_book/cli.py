@@ -41,6 +41,12 @@ def build_parser() -> ArgumentParser:
         help="Disable printing page numbers on each page",
     )
     parser.set_defaults(page_numbers=True)
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Number of parallel render workers (default: 1)",
+    )
 
     return parser
 
@@ -64,12 +70,19 @@ def main() -> None:
     out_dir = Path(args.out_dir)
     chapters_dir = out_dir / "chapters"
 
-    pdf_paths = render_posts_to_pdfs(posts, chapters_dir, delay_ms=args.delay_ms)
+    pdf_paths, rendered_posts = render_posts_to_pdfs(
+        posts, chapters_dir, delay_ms=args.delay_ms, workers=args.workers
+    )
+
+    if not rendered_posts:
+        raise SystemExit("[error] 没有成功渲染任何文章，已退出。")
+    if len(pdf_paths) != len(rendered_posts):
+        raise SystemExit("[error] 渲染结果数量不一致，请重试。")
 
     book_path = out_dir / f"{args.name}-{args.start}-{args.end}.pdf"
     merge_pdfs(
         pdf_paths,
-        posts,
+        rendered_posts,
         book_path,
         add_bookmarks=True,
         add_cover=args.cover,

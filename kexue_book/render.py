@@ -3,6 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Iterable, List
 import re
+import math
+import os
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from playwright.sync_api import Page, sync_playwright
 
@@ -91,28 +94,104 @@ def _render_single(page: Page, post: Post, target: Path, delay_ms: int) -> None:
     page.close()
 
 
-def render_posts_to_pdfs(
-    posts: Iterable[Post], output_dir: Path, delay_ms: int = 4000
-) -> List[Path]:
-    rendered_paths: List[Path] = []
-    posts_list = list(posts)
-    output_dir.mkdir(parents=True, exist_ok=True)
+def _render_batch(
+    indexed_posts: List[tuple[int, Post]],
+    output_dir_str: str,
+    delay_ms: int,
+) -> List[tuple[str, Post]]:
+    """
+    子进程中渲染一批 (index, post)，返回成功生成的 PDF 路径与对应 Post。
+    """
+    output_dir = Path(output_dir_str)
+    rendered: List[tuple[str, Post]] = []
+
     with sync_playwright() as p:
         browser = p.chromium.launch()
         context = browser.new_context()
-        for index, post in enumerate(posts_list, start=1):
+        total = len(indexed_posts)
+
+        for local_idx, (index, post) in enumerate(indexed_posts, start=1):
             filename = f"{index:03d}-{_safe_filename(post.title)}.pdf"
             pdf_path = output_dir / filename
             page = context.new_page()
             try:
-                print(f"[render] {index}/{len(posts_list)} {post.url}")
+                print(f"[worker pid={os.getpid()}] {index}/{total}: {post.url}")
                 _render_single(page, post, pdf_path, delay_ms)
-                rendered_paths.append(pdf_path)
-            except Exception as exc:
-                print(f"[warn] 渲染失败，跳过: {post.url} ({exc})")
+                rendered.append((str(pdf_path), post))
+            except Exception as exc:  # noqa: BLE001
+                print(f"[worker warn pid={os.getpid()}] 渲染失败，跳过: {post.url} ({exc})")
                 try:
                     page.close()
                 except Exception:
                     pass
+
         browser.close()
-    return rendered_paths
+
+    return rendered
+
+
+def render_posts_to_pdfs(
+    posts: Iterable[Post],
+    output_dir: Path,
+    delay_ms: int = 4000,
+    workers: int = 1,
+) -> tuple[List[Path], List[Post]]:
+    rendered_paths: List[Path] = []
+    rendered_posts: List[Post] = []
+    posts_list = list(posts)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    if not posts_list:
+        return [], []
+
+    # 单进程模式：保持原有行为
+    if workers <= 1:
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            context = browser.new_context()
+            for index, post in enumerate(posts_list, start=1):
+                filename = f"{index:03d}-{_safe_filename(post.title)}.pdf"
+                pdf_path = output_dir / filename
+                page = context.new_page()
+                try:
+                    print(f"[render] {index}/{len(posts_list)} {post.url}")
+                    _render_single(page, post, pdf_path, delay_ms)
+                    rendered_paths.append(pdf_path)
+                    rendered_posts.append(post)
+                except Exception as exc:  # noqa: BLE001
+                    print(f"[warn] 渲染失败，跳过: {post.url} ({exc})")
+                    try:
+                        page.close()
+                    except Exception:
+                        pass
+            browser.close()
+        return rendered_paths, rendered_posts
+
+    # 并行模式
+    workers = min(workers, len(posts_list))
+    indexed: List[tuple[int, Post]] = list(enumerate(posts_list, start=1))
+    chunk_size = math.ceil(len(indexed) / workers)
+    chunks: List[List[tuple[int, Post]]] = [
+        indexed[i : i + chunk_size] for i in range(0, len(indexed), chunk_size)
+    ]
+
+    print(f"[render] 并行渲染 workers={len(chunks)}, total_posts={len(posts_list)}")
+
+    with ProcessPoolExecutor(max_workers=len(chunks)) as executor:
+        futures = [
+            executor.submit(_render_batch, chunk, str(output_dir), delay_ms) for chunk in chunks
+        ]
+        combined: List[tuple[str, Post]] = []
+        for fut in as_completed(futures):
+            try:
+                combined.extend(fut.result())
+            except Exception as exc:  # noqa: BLE001
+                print(f"[worker error] 子进程异常: {exc}")
+
+    # 按文件名排序，保证顺序与 posts_list 对齐
+    combined.sort(key=lambda item: Path(item[0]).name)
+    for path_str, post in combined:
+        rendered_paths.append(Path(path_str))
+        rendered_posts.append(post)
+
+    return rendered_paths, rendered_posts

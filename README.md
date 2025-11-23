@@ -58,7 +58,8 @@ python -m kexue_book.cli \
   --end   2025-12-31 \
   --out-dir output \
   --name "Kexue-BigData" \
-  --cover
+  --cover \
+  --workers 16
 ```
 
 生成结果示例：
@@ -105,6 +106,9 @@ python -m kexue_book.cli \
 * `--delay-ms N`  
   每篇文章在打印 PDF 前额外等待的毫秒数，用于确保 MathJax 等脚本完成渲染（默认：4000）。
 
+* `--workers N`  
+  并行渲染的进程数（默认：1，单进程顺序渲染）。大约 4~6 视机器性能选择，过高会占用更多 CPU/内存、也会同时给源站施压。
+
 调试用参数：
 
 * `--limit N`  
@@ -127,7 +131,8 @@ python -m kexue_book.cli \
    * 使用 Playwright + Chromium 打开文章页面；  
    * 等待网络稳定，再额外等待 `--delay-ms` 毫秒以保证 MathJax 完全渲染；  
    * 注入一段打印专用 CSS：隐藏头部导航、侧边栏、评论等非正文；控制版芯宽度、字体和行距；  
-   * 调用 `page.pdf()` 导出为 A4 纸大小的单篇 PDF，存到 `output/chapters/`。
+   * 调用 `page.pdf()` 导出为 A4 纸大小的单篇 PDF，存到 `output/chapters/`；  
+   * 支持 `--workers N` 并行渲染（每个进程自己的 Chromium），个别失败会跳过并继续。
 
 3. **合并与排版（merge）**  
    使用 `pypdf` 和 `reportlab`：  
