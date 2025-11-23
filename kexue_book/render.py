@@ -7,7 +7,7 @@ import math
 import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-from playwright.sync_api import Page, sync_playwright
+from playwright.sync_api import Error as PlaywrightError, Page, sync_playwright
 
 from .types import Post
 
@@ -66,14 +66,12 @@ def _navigate_with_retries(page: Page, url: str) -> None:
         ),
     ]
 
-    last_exc: Exception | None = None
+    last_exc: PlaywrightError | None = None
     for _, attempt in attempts:
         try:
             attempt()
             return
-        except (
-            Exception
-        ) as exc:  # noqa: BLE001 - we want to retry on any navigation failure
+        except PlaywrightError as exc:
             last_exc = exc
     if last_exc:
         raise last_exc
@@ -110,7 +108,7 @@ def _render_batch(
         context = browser.new_context()
         total = len(indexed_posts)
 
-        for local_idx, (index, post) in enumerate(indexed_posts, start=1):
+        for index, post in indexed_posts:
             filename = f"{index:03d}-{_safe_filename(post.title)}.pdf"
             pdf_path = output_dir / filename
             page = context.new_page()
@@ -118,11 +116,13 @@ def _render_batch(
                 print(f"[worker pid={os.getpid()}] {index}/{total}: {post.url}")
                 _render_single(page, post, pdf_path, delay_ms)
                 rendered.append((str(pdf_path), post))
-            except Exception as exc:  # noqa: BLE001
-                print(f"[worker warn pid={os.getpid()}] 渲染失败，跳过: {post.url} ({exc})")
+            except PlaywrightError as exc:
+                print(
+                    f"[worker warn pid={os.getpid()}] 渲染失败，跳过: {post.url} ({exc})"
+                )
                 try:
                     page.close()
-                except Exception:
+                except PlaywrightError:
                     pass
 
         browser.close()
@@ -158,11 +158,11 @@ def render_posts_to_pdfs(
                     _render_single(page, post, pdf_path, delay_ms)
                     rendered_paths.append(pdf_path)
                     rendered_posts.append(post)
-                except Exception as exc:  # noqa: BLE001
+                except PlaywrightError as exc:
                     print(f"[warn] 渲染失败，跳过: {post.url} ({exc})")
                     try:
                         page.close()
-                    except Exception:
+                    except PlaywrightError:
                         pass
             browser.close()
         return rendered_paths, rendered_posts
@@ -179,13 +179,14 @@ def render_posts_to_pdfs(
 
     with ProcessPoolExecutor(max_workers=len(chunks)) as executor:
         futures = [
-            executor.submit(_render_batch, chunk, str(output_dir), delay_ms) for chunk in chunks
+            executor.submit(_render_batch, chunk, str(output_dir), delay_ms)
+            for chunk in chunks
         ]
         combined: List[tuple[str, Post]] = []
         for fut in as_completed(futures):
             try:
                 combined.extend(fut.result())
-            except Exception as exc:  # noqa: BLE001
+            except PlaywrightError as exc:
                 print(f"[worker error] 子进程异常: {exc}")
 
     # 按文件名排序，保证顺序与 posts_list 对齐
