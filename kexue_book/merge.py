@@ -8,8 +8,13 @@ from pypdf import PdfReader, PdfWriter
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 
 from .types import Post
+
+# 注册内置中文字体，避免封面中文字符变成方块
+pdfmetrics.registerFont(UnicodeCIDFont("STSong-Light"))
 
 
 def _make_cover_pdf(title: str) -> io.BytesIO:
@@ -19,10 +24,10 @@ def _make_cover_pdf(title: str) -> io.BytesIO:
     width, height = A4
 
     c.setTitle(title)
-    c.setFont("Helvetica-Bold", 32)
+    c.setFont("STSong-Light", 32)
     c.drawCentredString(width / 2.0, height * 0.55, title)
 
-    c.setFont("Helvetica", 14)
+    c.setFont("STSong-Light", 14)
     c.drawCentredString(width / 2.0, height * 0.48, "Scientific Spaces · Big-Data")
 
     c.showPage()

@@ -150,8 +150,8 @@ python -m kexue_book.cli \
 * 第一次运行时 Playwright 会下载 Chromium，时间可能略长。
 * 如果科学空间将来更换主题或改版 HTML 结构，`crawl.py` 里的 CSS 选择器（例如 `div.Post`, `span.submitted`）可能需要微调。
 * 封面目前使用 ReportLab 的内置 Helvetica 字体直接绘制 **“苏剑林选集”**，在某些环境下可能出现方框。想要更漂亮/稳健的中文封面，可以：
-  * 自己下载中文字体（如 Noto Serif SC / 思源宋体），
-  * 在 `merge.py` 的 `_make_cover_pdf` 中注册对应 TTF 并替换 `setFont("Helvetica-Bold", 32)`。
+  * 已默认改用 ReportLab 内置的 `STSong-Light` 来避免方框；如果想换成自定义中文字体（如 Noto Serif SC / 思源宋体），
+  * 在 `merge.py` 的 `_make_cover_pdf` 中注册对应 TTF 并替换 `setFont("STSong-Light", 32)`。
 * 渲染逻辑默认假设原文中的公式由 MathJax 渲染，且在 `--delay-ms` 指定时间内能完成；如果发现部分页面公式缺失，可以适当调大该参数。
 * 生成的 PDF 仅用于 **个人学习和收藏**，请尊重原站点的 CC BY-NC-SA 协议，转载或分发时务必注明原作者“苏剑林”和科学空间链接。
 
