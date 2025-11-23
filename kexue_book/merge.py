@@ -28,7 +28,7 @@ def _make_cover_pdf(title: str) -> io.BytesIO:
     c.drawCentredString(width / 2.0, height * 0.55, title)
 
     c.setFont("STSong-Light", 14)
-    c.drawCentredString(width / 2.0, height * 0.48, "Scientific Spaces · Big-Data")
+    c.drawCentredString(width / 2.0, height * 0.48, "Scientific Spaces Big-Data")
 
     c.showPage()
     c.save()
