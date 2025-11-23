@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Iterable, List
-import re
 import math
 import os
+import re
+from pathlib import Path
+from typing import Iterable, List
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from playwright.sync_api import Error as PlaywrightError, Page, sync_playwright
@@ -40,6 +40,18 @@ pre, code {
 """
 
 SAFE_NAME_PATTERN = re.compile(r"[^\w\u4e00-\u9fff-]+")
+
+# Viewport settings that align MathJax layout with the printable A4 area. The
+# Scientific Spaces site scales MathJax output according to the window width at
+# render time; matching the viewport to the A4 content area avoids right-edge
+# clipping of equation numbers and long underbrace expressions when exporting to
+# PDF.
+CSS_PX_PER_MM = 96 / 25.4
+A4_WIDTH_MM = 210
+LEFT_MARGIN_MM = 16
+RIGHT_MARGIN_MM = 16
+CONTENT_WIDTH_PX = int((A4_WIDTH_MM - LEFT_MARGIN_MM - RIGHT_MARGIN_MM) * CSS_PX_PER_MM)
+VIEWPORT = {"width": CONTENT_WIDTH_PX, "height": 1200}
 
 
 def _safe_filename(title: str) -> str:
@@ -105,7 +117,7 @@ def _render_batch(
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
-        context = browser.new_context()
+        context = browser.new_context(viewport=VIEWPORT, ignore_https_errors=True)
         total = len(indexed_posts)
 
         for index, post in indexed_posts:
@@ -148,7 +160,7 @@ def render_posts_to_pdfs(
     if workers <= 1:
         with sync_playwright() as p:
             browser = p.chromium.launch()
-            context = browser.new_context()
+            context = browser.new_context(viewport=VIEWPORT, ignore_https_errors=True)
             for index, post in enumerate(posts_list, start=1):
                 filename = f"{index:03d}-{_safe_filename(post.title)}.pdf"
                 pdf_path = output_dir / filename
