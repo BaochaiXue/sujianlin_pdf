@@ -1,6 +1,29 @@
-output
+output/
 output_demo/
 genearte_all_code.py
 all_code.md
-kexue_book/__pycache__
 idea.md
+
+# Python cache/build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# macOS / editor noise
+.DS_Store
+._*
+.idea/
+.vscode/

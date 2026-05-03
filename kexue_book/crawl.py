@@ -12,7 +12,7 @@ from .types import Post
 
 BASE_CATEGORY_URL = "https://spaces.ac.cn/category/Big-Data"
 DATE_PATTERN = re.compile(r"(\d{4}-\d{2}-\d{2})")
-ARCHIVE_ID_PATTERN = re.compile(r"/(\\d+)$")
+ARCHIVE_ID_PATTERN = re.compile(r"/(\d+)$")
 
 
 def _parse_post(post_element: BeautifulSoup) -> Post:

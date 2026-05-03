@@ -18,6 +18,7 @@ kexue_book/
   cli.py        # 命令行入口（python -m kexue_book.cli）
 output/          # 运行后生成的输出目录
   chapters/      # 渲染出的单篇 PDF
+  manifest.json  # 每篇文章的渲染状态、PDF 路径、页数和失败原因
   *.pdf          # 最终合并后的“选集”PDF
 requirements.txt
 README.md
@@ -65,6 +66,7 @@ python -m kexue_book.cli \
 生成结果示例：
 
 * 单篇 PDF：`output/chapters/001-XXXX.pdf`, `002-YYYY.pdf`, ...
+* 渲染清单：`output/manifest.json`
 * 合并书籍：`output/Kexue-BigData-2015-01-01-2025-12-31.pdf`
 
 ---
@@ -76,6 +78,9 @@ python -m kexue_book.cli \
 * 页脚会印出 **真实页码**，从整本书的第一页（封面）开始连续编号；可用 `--no-page-numbers` 关闭。
 * 可选封面 `--cover`，标题为 **“苏剑林选集”**，副标题为 “Scientific Spaces · Big-Data”。
 * 会自动隐藏站点的侧边栏、评论区等元素，正文和公式（MathJax 渲染）都会保留。
+* 支持按标题关键词选择或排除文章，例如只打包标题含 “Transformer” 或 “注意力” 的文章。
+* 每次渲染会生成 `manifest.json`，记录每篇文章的标题、URL、日期、序号、PDF 路径、状态、失败原因和页数。
+* 支持断点续跑：`--resume` 会跳过已有且可读取、页数大于 0 的单篇 PDF；`--retry-failed` 只重试上一次 `manifest.json` 中失败的文章。
 
 ---
 
@@ -101,6 +106,22 @@ python -m kexue_book.cli \
 * `--no-page-numbers`  
   关闭每页底部的页码（默认是 **有** 页码的）。
 
+标题过滤：
+
+* `--title-keyword TEXT`
+  只保留标题包含指定关键词的文章。可以重复使用，也可以用英文逗号分隔多个关键词，例如 `--title-keyword Transformer,注意力`。
+
+* `--title-match any|all`
+  多个 `--title-keyword` 的匹配方式：
+  * `any`：命中任意一个关键词即可保留（默认）。
+  * `all`：必须同时命中所有关键词才保留。
+
+* `--exclude-title-keyword TEXT`
+  排除标题包含指定关键词的文章。可以重复使用，也可以用英文逗号分隔多个关键词。
+
+* `--title-case-sensitive`
+  标题关键词匹配改为大小写敏感。默认不区分大小写。
+
 渲染控制：
 
 * `--delay-ms N`  
@@ -109,10 +130,28 @@ python -m kexue_book.cli \
 * `--workers N`  
   并行渲染的进程数（默认：1，单进程顺序渲染）。大约 4~6 视机器性能选择，过高会占用更多 CPU/内存、也会同时给源站施压。
 
+* `--resume`
+  复用 `output/chapters/` 中已经存在且有效的单篇 PDF，只渲染缺失或损坏的文章。有效性的判断标准是 PDF 能被读取且页数大于 0。
+
+* `--retry-failed`
+  读取上一次的 `output/manifest.json`，只重试其中状态为失败的文章；上次成功且 PDF 仍有效的文章会直接复用。如果没有旧的 `manifest.json`，命令会退出并提示。
+
 调试用参数：
 
 * `--limit N`  
   只抓取并渲染前 N 篇文章，适合调试样式/字体时使用，不想一次扫全站。
+  如果同时使用标题过滤，程序会先按标题过滤，再应用 `--limit`。
+
+标题过滤示例：
+
+```bash
+python -m kexue_book.cli \
+  --start 2015-01-01 \
+  --end 2025-12-31 \
+  --title-keyword Transformer,注意力 \
+  --exclude-title-keyword 闲聊 \
+  --out-dir output-transformer
+```
 
 ---
 
@@ -125,6 +164,7 @@ python -m kexue_book.cli \
    * 每篇文章的标题、URL 和发布日期；  
    * 按 `--start` / `--end` 过滤在时间区间内的文章；  
    * 按 `--order` 指定的顺序排序。
+   * 如果设置了标题关键词，则按 `--title-keyword` / `--exclude-title-keyword` 进一步筛选。
 
 2. **单篇渲染（render）**  
    对每一篇文章：  
@@ -133,9 +173,11 @@ python -m kexue_book.cli \
    * 注入一段打印专用 CSS：隐藏头部导航、侧边栏、评论等非正文；控制版芯宽度、字体和行距；  
    * 调用 `page.pdf()` 导出为 A4 纸大小的单篇 PDF，存到 `output/chapters/`；  
    * 支持 `--workers N` 并行渲染（每个进程自己的 Chromium），个别失败会跳过并继续。
+   * 写入 `output/manifest.json`，记录每篇文章成功/失败、失败原因、PDF 路径和页数。
 
 3. **合并与排版（merge）**  
    使用 `pypdf` 和 `reportlab`：  
+   * 合并前输出完整性检查：成功多少篇、失败多少篇，以及缺失的 URL；
    * 按顺序合并所有单篇 PDF；  
    * 如果开启 `--cover`，在最前面添加一页封面；  
    * 为每篇文章创建一个 PDF 书签（outline item），相当于一个可点击的目录；  
